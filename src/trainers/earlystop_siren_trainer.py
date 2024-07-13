@@ -195,6 +195,7 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         reconstruct = torch.zeros_like(gt_noisy).to(self._device)
+        
         for batch_idx in range(0, image_res, chunk):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
@@ -204,7 +205,9 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
         gt_noisy = normalize(gt_noisy, [-1, 1], [0, 255])
         reconstruct = normalize(reconstruct, [-1, 1], [0, 255])
         error = torch.mean((reconstruct - gt_noisy)**2)
-        noise_level2 = self.config['data_args']['noise_level']**2
+
+        # noise_level2 = self.config['data_args']['noise_level']**2
+        noise_level2 = self.train_eval_set.noise_level_est**2
 
         if error <= noise_level2:
             return True

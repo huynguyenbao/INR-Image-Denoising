@@ -3,7 +3,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from src.data_loaders.data_modules import SingleImageDataset
+from data_loaders.single_image_dataset import SingleImageDataset
 from src.trainers.siren_trainer import SIRENTrainer
 from src.trainers.boosting_siren_trainer import BOOSTING_SIRENTrainer
 from src.trainers.earlystop_siren_trainer import EARLYSTOP_SIRENTrainer
