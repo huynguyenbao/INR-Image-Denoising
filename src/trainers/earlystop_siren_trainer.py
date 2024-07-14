@@ -153,8 +153,9 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
         pbar.close()
 
         eval_results = {}
-        reconstruct_transformed = normalize(reconstruct, self.config['data_args']['irange'], [0, 1])
-        gt_clean_transformed = normalize(gt_clean, self.config['data_args']['irange'], [0, 1])
+        output_range =  self.config['data_args']['target_range']
+        reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
+        gt_clean_transformed = normalize(gt_clean, output_range, [0, 1])
 
         for metric_key, metric_func in self.metric_functions.items():
             result = metric_func.compute(reconstruct_transformed, gt_clean_transformed)
@@ -166,7 +167,7 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
         
-        denoised = normalize(denoised, self.config['data_args']['irange'], [0, 255])
+        denoised = normalize(denoised, self.config['data_args']['target_range'], [0, 255])
         denoised = denoised.astype(np.int32)
 
         image_path = os.path.join(
@@ -183,10 +184,8 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
         
         return self.eval_metrics.result()
     
-    def is_early_stopping(self, current_result):
+    def is_early_stopping(self):
         self.model.eval()
-        print('Validating Early Stopping')
-
         image_res = self.train_eval_set.image_res
         chunk = self.chunk
 
@@ -202,8 +201,10 @@ class EARLYSTOP_SIRENTrainer(BaseTrainer):
             reconstruct[:, batch_indices] = self.model(batch_coords)
         
         # Stoping criteria
-        gt_noisy = normalize(gt_noisy, [-1, 1], [0, 255])
-        reconstruct = normalize(reconstruct, [-1, 1], [0, 255])
+        output_range = self.config['data_args']['target_range']
+        
+        gt_noisy = normalize(gt_noisy, output_range, [0, 1])
+        reconstruct = normalize(reconstruct, output_range, [0, 1])
         error = torch.mean((reconstruct - gt_noisy)**2)
 
         # noise_level2 = self.config['data_args']['noise_level']**2

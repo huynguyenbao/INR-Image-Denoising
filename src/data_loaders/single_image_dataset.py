@@ -6,19 +6,21 @@ class SingleImageDataset:
     """
     Base class for all data loaders
     """
-    def __init__(self, image_path, noise_level, RGB_mode, irange):
+    def __init__(self, image_path, noise_level, RGB_mode, target_range, **dasetset_kwargs):
 
         # Prepare Images
         input_image = read_image(image_path, RGB_mode)
         corrupted_image = add_Gaussian_noise(input_image, noise_level)
+        original_range = [0, 255]
 
         # Estimate Noise Level
-        self.noise_level_est = noise_estimate(corrupted_image)
+        self.noise_level_est = noise_estimate(
+            normalize(corrupted_image, original_range, [0, 1])
+        )
 
         # Intensity Transformation
-        orange = [0, 255]
-        noisy_image = normalize(corrupted_image, orange, irange)
-        clean_image = normalize(input_image, orange, irange)
+        noisy_image = normalize(corrupted_image, original_range, target_range)
+        clean_image = normalize(input_image, original_range, target_range)
         
         # Create Training Data
         H, W = noisy_image.shape[:2]

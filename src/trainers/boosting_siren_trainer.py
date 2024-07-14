@@ -62,8 +62,8 @@ class BOOSTING_SIRENTrainer(BaseTrainer):
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
         
         # Additional Config
-        self.lifecycle = self.config['trainer_config']['lifecycle']
-        self.counter = 0
+        self.update_cycle = self.config['trainer_config']['update_cycle']
+        self.update_counter = 0
         self.psuedo_target = None
 
     def _train_epoch(self):
@@ -163,8 +163,8 @@ class BOOSTING_SIRENTrainer(BaseTrainer):
         pbar.close()
 
         eval_results = {}
-        reconstruct_transformed = normalize(reconstruct, self.config['data_args']['irange'], [0, 1])
-        gt_clean_transformed = normalize(gt_clean, self.config['data_args']['irange'], [0, 1])
+        reconstruct_transformed = normalize(reconstruct, self.config['data_args']['target_range'], [0, 1])
+        gt_clean_transformed = normalize(gt_clean, self.config['data_args']['target_range'], [0, 1])
 
         for metric_key, metric_func in self.metric_functions.items():
             result = metric_func.compute(reconstruct_transformed, gt_clean_transformed)
@@ -176,7 +176,7 @@ class BOOSTING_SIRENTrainer(BaseTrainer):
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
         
-        denoised = normalize(denoised, self.config['data_args']['irange'], [0, 255])
+        denoised = normalize(denoised, self.config['data_args']['target_range'], [0, 255])
         denoised = denoised.astype(np.int32)
 
         image_path = os.path.join(
@@ -194,9 +194,9 @@ class BOOSTING_SIRENTrainer(BaseTrainer):
         return self.eval_metrics.result()
     
     def update_target(self, gt_noisy, reconstruction):
-        self.counter += 1
+        self.update_counter += 1
 
-        if self.counter >= self.lifecycle:
+        if self.update_counter >= self.update_cycle:
             print(f"Updating Target.")
-            self.counter = 0
+            self.update_counter = 0
             self.psuedo_target = (reconstruction.detach() + gt_noisy) / 2

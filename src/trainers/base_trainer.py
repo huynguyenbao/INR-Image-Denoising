@@ -79,18 +79,11 @@ class BaseTrainer:
         self.monitor = self.trainer_config.get('monitor', 'off')
         if self.monitor == 'off':
             self.monitor_mode = 'off'
-            self.monitor_best = 0
         else:
-            self.monitor_mode, self.monitor_metric = self.monitor.split()
-            assert self.monitor_mode in ['min', 'max']
-
-            self.monitor_best = inf if self.monitor_mode == 'min' else -inf
-
-            # Only enable early stopping if given and above 0
             self.early_stop = self.trainer_config.get('early_stop', inf)
-            if self.early_stop <= 0:
-                self.early_stop = inf # training proceeds till the very last epoch
-
+            if self.early_stop > 0:
+               self.monitor_mode = 'off'
+ 
     @abstractmethod # To be implemented by the child classes!
     def _train_epoch(self):
         """
@@ -131,52 +124,21 @@ class BaseTrainer:
                 self.eval_result_history[self.current_epoch] = eval_result
 
             if self.monitor_mode != 'off' : # Then there is a metric to monitor
-                if self.monitor_metric in log: # Then we have measured it in this epoch
-                    #################################################################################################
-                    # TODO: Q2.b: Use the dictionaries above to see if this is the best epoch based                 #
-                    # on self.monitor_metric. If so, use self.save_model() to save the best model checkpoint.       #
-                    # Don't forget to pre-pend self.checkpoint_dir to the path argument.                            #
-                    # We also recommend printing the epoch number so that later from the logs.                      #
-                    # check whether model performance improved or not, according to specified metric(monitor_metric)#
-                    # These were configured in the self._configure_monitoring()                                     #
-                    # You may have to check for min or max value based on monitor_mode                              #
-                    # (e.g for loss values we would want min, but for accuracy we want max.)                        #
-                    #################################################################################################   
+
+                if self.is_early_stopping():
+                    print("X-X Early stopping at epoch: {}".format(self.current_epoch))
+                    self.logger.info("X-X Early stopping at epoch: {}".format(self.current_epoch))
                     
-                    # Detecting the best model
-                    is_best = False
-                    current_metric_result = log.get(self.monitor_metric)
+                    eval_result = self.evaluate()
+                    # save eval information to the log dict as well
+                    log.update({f'eval_{key}': value for key, value in eval_result.items()})
 
-                    if self.monitor_mode == 'min':
-                        if current_metric_result < self.monitor_best + self.min_delta:
-                            is_best = True
-                    else:
-                        if current_metric_result > self.monitor_best + self.min_delta:
-                            is_best = True
+                    # store the eval_result to plot
+                    self.eval_result_history[self.current_epoch] = eval_result
+                    
+                    break
 
-                    # Updating and Saving the best evaluation model
-                    if is_best:
-                        print("<@@> Best evaluation model at epoch: {}".format(self.current_epoch))
-                        self.monitor_best = current_metric_result
-                        self.logger.info("<@@> Best evaluation model at epoch: {}".format(self.current_epoch))
-                        path = os.path.join(self.checkpoint_dir, f'best_val_model.pth')
-                        self.save_model(path=path)
-
-                    ############################################################################################
-                    # TODO: Q2.c: Based self.monitor_metric and whether we have had improvements in            #
-                    # the last self.early_stop steps, see if you should break the training loop.               #
-                    ############################################################################################
-                    if self.is_early_stopping(current_metric_result):
-                        print("X-X Early stopping at epoch: {}".format(self.current_epoch))
-                        self.logger.info("X-X Early stopping at epoch: {}".format(self.current_epoch))
-                        break
-
-                    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-                else:
-                    ## The metric wasn't measured in this epoch. Don't change not_impoved_count or similar things here!!!
-                    self.logger.warning(f"Warning: At epoch {self.current_epoch} Metric '{self.monitor_metric}'"+\
-                                " wasn't measured. Not monitoring it for this epoch.")
-            
+       
             # print logged information to the screen
             for key, value in log.items():
                 self.logger.info(f'    {key[:15]}: {value:0.5f}')
@@ -243,7 +205,7 @@ class BaseTrainer:
         self.logger.info("Checkpoint loaded.")
     
     @abstractmethod # To be implemented by the child classes!
-    def is_early_stopping(self, current_result):
+    def is_early_stopping(self):
         """
         Checks early stopping from the history
         : param eval_result_history: history of evaluation results

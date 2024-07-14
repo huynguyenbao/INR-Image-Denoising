@@ -49,7 +49,7 @@ def noise_estimate(im, pch_size=8):
     Chen G , Zhu F , Heng P A . An Efficient Statistical Method for Image Noise Level Estimation[C]// 2015 IEEE International Conference
     on Computer Vision (ICCV). IEEE Computer Society, 2015.
     Input:
-        im: the noise image, H x W x 3 or H x W numpy tensor, range [0, 255]
+        im: the noise image, H x W x 3 or H x W numpy tensor, range [0, 1]
         pch_size: patch_size
     Output:
         noise_level: the estimated noise level
@@ -59,9 +59,7 @@ def noise_estimate(im, pch_size=8):
         im = im.transpose((2, 0, 1))
     else:
         im = np.expand_dims(im, axis=0)
-    
-    im = im.astype(np.float32) / 255.0
-    
+        
     # image to patch
     pch = im2patch(im, pch_size, 3)  # C x pch_size x pch_size x num_pch tensor
     num_pch = pch.shape[3]
