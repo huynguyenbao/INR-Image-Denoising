@@ -8,7 +8,7 @@ from src.utils.img_utils import normalize, save_image
 import numpy as np
 import os
 
-class SBOOST_SIRENTrainer(BaseTrainer):
+class BaselineTrainer(BaseTrainer):
 
     def __init__(self, config, log_dir, train_eval_set):
         """
@@ -44,13 +44,17 @@ class SBOOST_SIRENTrainer(BaseTrainer):
 
         # Prepare Metrics
         self.metric_functions = self.config['metrics']
+
         self.train_metrics = MetricTracker(
-            keys=['loss'],
+            keys=['loss'] + [metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
+        
+        self.eval_N = 0
         self.eval_metrics = MetricTracker(
             keys=[metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
 
+        # Baseline Result
         eval_results = {}        
         for metric_key, metric_func in self.metric_functions.items():
             result = metric_func.compute(train_eval_set.gt_noisy, train_eval_set.gt_clean)
@@ -60,14 +64,6 @@ class SBOOST_SIRENTrainer(BaseTrainer):
 
         for metric_key, result in eval_results.items():
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
-        
-        # Additional Config
-        self.update_cycle = self.config['trainer_config']['update_cycle']
-        self.update_counter = 0
-        self.psuedo_target = None
-
-        self.alph = 0.5
-        self.N = 0
 
     def _train_epoch(self):
         """
@@ -90,23 +86,20 @@ class SBOOST_SIRENTrainer(BaseTrainer):
         
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
-        reconstruction = torch.zeros_like(gt_noisy).to(self._device)
-
-        if self.psuedo_target is None:
-            self.psuedo_target = gt_noisy.clone()
+        reconstruct = torch.zeros_like(gt_noisy).to(self._device)
 
         for batch_idx in range(0, image_res, chunk):
 
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
 
             batch_coords = coords[:, batch_indices, ...]
-            batch_gt_noisy = self.psuedo_target[:, batch_indices, :]
-            
+            batch_gt_noisy = gt_noisy[:, batch_indices, :]
+
             output = self.model.forward(batch_coords)
-            reconstruction[:, batch_indices, :] = output
+            reconstruct[:, batch_indices, :] = output
 
             loss = self.criterion(output, batch_gt_noisy)
-            
+
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -120,10 +113,17 @@ class SBOOST_SIRENTrainer(BaseTrainer):
             pbar.set_description(f"Train Epoch: {self.current_epoch} Loss: {loss.item():.4f}")
 
             pbar.update(chunk)
-
-        # Update target to prevent overfitting
-        self.update_target(gt_noisy, reconstruction)
         
+        # Compute PNSR/ ... between reconstruction and noisy image
+        output_range = self.config['data_args']['target_range']
+        reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
+        gt_noisy_transformed = normalize(gt_noisy, output_range, [0, 1])
+
+        for metric_key, metric_func in self.metric_functions.items():
+            result = metric_func.compute(reconstruct_transformed, gt_noisy_transformed)
+            self.train_metrics.update(metric_key, result)
+
+
         log_dict = self.train_metrics.result()
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
@@ -152,19 +152,18 @@ class SBOOST_SIRENTrainer(BaseTrainer):
         indices = torch.randperm(image_res).to(self._device)
         
         coords = self.train_eval_set.coords.to(self._device)
-        # gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         gt_clean = self.train_eval_set.gt_clean.to(self._device)
         reconstruct = torch.zeros_like(gt_clean).to(self._device)
-        for batch_idx in range(0, image_res, chunk):
 
+        for batch_idx in range(0, image_res, chunk):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
-
             reconstruct[:, batch_indices] = self.model(batch_coords)
-
             pbar.update(chunk)
+
         pbar.close()
 
+        # Compute PNSR/ ... between reconstruction and clean image
         eval_results = {}
         output_range = self.config['data_args']['target_range']
         reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
@@ -186,8 +185,8 @@ class SBOOST_SIRENTrainer(BaseTrainer):
         image_path = os.path.join(
             self.config['trainer_config']['save_dir'], 
             self.config['name'] ,
-            'eval.png')
-        
+            'eval_{}.png'.format(self.eval_N))
+        self.eval_N += 1
         save_image(image_path, denoised, self.config['data_args']['RGB_mode'])
 
         for metric_key, result in eval_results.items():
@@ -196,14 +195,3 @@ class SBOOST_SIRENTrainer(BaseTrainer):
         self.logger.debug(f"++> Finished evaluating epoch {self.current_epoch}.")
         
         return self.eval_metrics.result()
-    
-    def update_target(self, gt_noisy, reconstruction):
-        self.update_counter += 1
-
-        if self.update_counter >= self.update_cycle:
-            print(f"Updating Target.")
-            self.update_counter = 0
-            self.N += 1
-            # damp = self.alph / self.N**2
-            damp = np.exp(-self.N / 2.0)
-            self.psuedo_target = (1 - damp) * reconstruction.detach() + damp * gt_noisy

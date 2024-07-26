@@ -82,7 +82,7 @@ class BaseTrainer:
         else:
             self.early_stop = self.trainer_config.get('early_stop', inf)
             if self.early_stop > 0:
-               self.monitor_mode = 'off'
+               self.monitor_mode = 'on'
  
     @abstractmethod # To be implemented by the child classes!
     def _train_epoch(self):

@@ -8,7 +8,7 @@ from src.utils.img_utils import normalize, save_image
 import numpy as np
 import os
 
-class PYRAMID_SIRENTrainer(BaseTrainer):
+class EarlystopTrainer(BaseTrainer):
 
     def __init__(self, config, log_dir, train_eval_set):
         """
@@ -34,6 +34,7 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
         # Configure the optimizer and lr scheduler
         # These are usually Python Partial() objects that have all the options already inserted.
         self.optimizer = self.config['optimizer'](trainable_params)
+        # self.lr_scheduler = self.config['lr_scheduler'](self.optimizer) 
 
         # Set Dataset
         self.train_eval_set = train_eval_set
@@ -52,20 +53,13 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
 
         eval_results = {}        
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(train_eval_set.gt_noisy[0], train_eval_set.gt_clean)
+            result = metric_func.compute(train_eval_set.gt_noisy, train_eval_set.gt_clean)
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result
 
         for metric_key, result in eval_results.items():
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
-        
-        # Additional Config
-        self.iters_per_level = self.config['trainer_config']['iters_per_level']
-        self.level_counter = 0
-        self.pyramid_level = self.train_eval_set.pyramid_levels - 1
-
-        self.psuedo_target = None
 
     def _train_epoch(self):
         """
@@ -86,9 +80,8 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
         pbar = tqdm(total=image_res, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         indices = torch.randperm(image_res)
         
-        coords = self.train_eval_set.coords.to(self._device)
-        gt_noisy = self.train_eval_set.gt_noisy[self.get_level()].to(self._device)
-        reconstruction = torch.zeros_like(gt_noisy).to(self._device)
+        coords = self.train_eval_set.coords
+        gt_noisy = self.train_eval_set.gt_noisy
 
         for batch_idx in range(0, image_res, chunk):
 
@@ -96,12 +89,13 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
 
             batch_coords = coords[:, batch_indices, ...]
             batch_gt_noisy = gt_noisy[:, batch_indices, :]
-            
-            output = self.model.forward(batch_coords)
-            reconstruction[:, batch_indices, :] = output
 
+            batch_coords = batch_coords.to(self._device)
+            batch_gt_noisy = batch_gt_noisy.to(self._device)
+
+            output = self.model.forward(batch_coords)
             loss = self.criterion(output, batch_gt_noisy)
-            
+
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -117,6 +111,7 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
             pbar.update(chunk)
 
         log_dict = self.train_metrics.result()
+
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
         
@@ -137,18 +132,33 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
 
         self.logger.debug(f"++> Evaluate at epoch {self.current_epoch} ...")
 
-        gt_clean = self.train_eval_set.gt_clean.to(self._device)
-        reconstruct = self.get_signal().to(self._device)
+        image_res = self.train_eval_set.image_res
+        chunk = self.chunk
 
-        # Stoping criteria
-        output_range = self.config['data_args']['target_range']
-        reconstruct = normalize(reconstruct, output_range, [0, 1])
-        gt_clean = normalize(gt_clean, output_range, [0, 1])
+        pbar = tqdm(total=image_res, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+        indices = torch.randperm(image_res).to(self._device)
+        
+        coords = self.train_eval_set.coords.to(self._device)
+        # gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
+        gt_clean = self.train_eval_set.gt_clean.to(self._device)
+        reconstruct = torch.zeros_like(gt_clean).to(self._device)
+        for batch_idx in range(0, image_res, chunk):
+
+            batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
+            batch_coords = coords[:, batch_indices, ...]
+
+            reconstruct[:, batch_indices] = self.model(batch_coords)
+
+            pbar.update(chunk)
+        pbar.close()
 
         eval_results = {}
+        output_range =  self.config['data_args']['target_range']
+        reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
+        gt_clean_transformed = normalize(gt_clean, output_range, [0, 1])
 
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(reconstruct, gt_clean)
+            result = metric_func.compute(reconstruct_transformed, gt_clean_transformed)
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result
@@ -157,7 +167,7 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
         
-        denoised = normalize(denoised, [0, 1], [0, 255])
+        denoised = normalize(denoised, self.config['data_args']['target_range'], [0, 255])
         denoised = denoised.astype(np.int32)
 
         image_path = os.path.join(
@@ -174,7 +184,7 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
         
         return self.eval_metrics.result()
     
-    def get_signal(self):
+    def is_early_stopping(self):
         self.model.eval()
         image_res = self.train_eval_set.image_res
         chunk = self.chunk
@@ -182,20 +192,26 @@ class PYRAMID_SIRENTrainer(BaseTrainer):
         indices = torch.randperm(image_res).to(self._device)
         
         coords = self.train_eval_set.coords.to(self._device)
-        gt_clean = self.train_eval_set.gt_clean.to(self._device)
-        reconstruct = torch.zeros_like(gt_clean).to(self._device)
+        gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
+        reconstruct = torch.zeros_like(gt_noisy).to(self._device)
         
         for batch_idx in range(0, image_res, chunk):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
             reconstruct[:, batch_indices] = self.model(batch_coords)
         
-        return reconstruct
-    
-    def get_level(self):
-        self.level_counter += 1
-        if self.level_counter > self.iters_per_level:
-            self.level_counter = 0
-            self.pyramid_level = max(0, self.pyramid_level - 1)
+        # Stoping criteria
+        output_range = self.config['data_args']['target_range']
         
-        return self.pyramid_level
+        gt_noisy = normalize(gt_noisy, output_range, [0, 1])
+        reconstruct = normalize(reconstruct, output_range, [0, 1])
+        error = torch.mean((reconstruct - gt_noisy)**2)
+
+        # noise_level2 = self.config['data_args']['noise_level']**2
+        noise_level2 = self.train_eval_set.noise_level_est**2
+
+        if error <= noise_level2:
+            return True
+        else:
+            return False
+       

@@ -5,11 +5,11 @@ import torch.nn as nn
 
 from src.data_loaders.single_image_dataset import SingleImageDataset
 from src.data_loaders.pyramid_image_dataset import PyramidImageDataset
-from src.trainers.siren_trainer import SIRENTrainer
-from src.trainers.boosting_siren_trainer import BOOSTING_SIRENTrainer
-from src.trainers.earlystop_siren_trainer import EARLYSTOP_SIRENTrainer
-from src.trainers.sboost_siren_trainer import SBOOST_SIRENTrainer
-from src.trainers.pyramid_siren_trainer import PYRAMID_SIRENTrainer
+from trainers.baseline_trainer import BaselineTrainer
+from trainers.boosting_trainer import BoostingTrainer
+from trainers.earlystop_trainer import EarlystopTrainer
+from trainers.sboost_trainer import SBoostTrainer
+from trainers.pyramid_trainer import PyramidTrainer
 from src.models.INR.siren import Siren
 from src.models.INR.metric import PSNR
 
@@ -49,7 +49,7 @@ q1_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = SIRENTrainer,
+    trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 700,
@@ -102,7 +102,7 @@ q2_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = EARLYSTOP_SIRENTrainer,
+    trainer_module = EarlystopTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 700,
@@ -155,7 +155,7 @@ q3_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = BOOSTING_SIRENTrainer,
+    trainer_module = BoostingTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 700,
@@ -210,7 +210,7 @@ q4_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = SBOOST_SIRENTrainer,
+    trainer_module = SBoostTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 1000,
@@ -260,7 +260,7 @@ q5_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = PYRAMID_SIRENTrainer,
+    trainer_module = PyramidTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 1000,

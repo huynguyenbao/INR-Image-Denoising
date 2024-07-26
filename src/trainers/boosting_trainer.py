@@ -8,7 +8,7 @@ from src.utils.img_utils import normalize, save_image
 import numpy as np
 import os
 
-class BOOSTING_SIRENTrainer(BaseTrainer):
+class BoostingTrainer(BaseTrainer):
 
     def __init__(self, config, log_dir, train_eval_set):
         """

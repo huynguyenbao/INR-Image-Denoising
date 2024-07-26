@@ -8,7 +8,7 @@ from src.utils.img_utils import normalize, save_image
 import numpy as np
 import os
 
-class SIRENTrainer(BaseTrainer):
+class SBoostTrainer(BaseTrainer):
 
     def __init__(self, config, log_dir, train_eval_set):
         """
@@ -60,6 +60,14 @@ class SIRENTrainer(BaseTrainer):
 
         for metric_key, result in eval_results.items():
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
+        
+        # Additional Config
+        self.update_cycle = self.config['trainer_config']['update_cycle']
+        self.update_counter = 0
+        self.psuedo_target = None
+
+        self.alph = 0.5
+        self.N = 0
 
     def _train_epoch(self):
         """
@@ -80,22 +88,25 @@ class SIRENTrainer(BaseTrainer):
         pbar = tqdm(total=image_res, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         indices = torch.randperm(image_res)
         
-        coords = self.train_eval_set.coords
-        gt_noisy = self.train_eval_set.gt_noisy
+        coords = self.train_eval_set.coords.to(self._device)
+        gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
+        reconstruction = torch.zeros_like(gt_noisy).to(self._device)
+
+        if self.psuedo_target is None:
+            self.psuedo_target = gt_noisy.clone()
 
         for batch_idx in range(0, image_res, chunk):
 
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
 
             batch_coords = coords[:, batch_indices, ...]
-            batch_gt_noisy = gt_noisy[:, batch_indices, :]
-
-            batch_coords = batch_coords.to(self._device)
-            batch_gt_noisy = batch_gt_noisy.to(self._device)
-
+            batch_gt_noisy = self.psuedo_target[:, batch_indices, :]
+            
             output = self.model.forward(batch_coords)
-            loss = self.criterion(output, batch_gt_noisy)
+            reconstruction[:, batch_indices, :] = output
 
+            loss = self.criterion(output, batch_gt_noisy)
+            
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -108,14 +119,12 @@ class SIRENTrainer(BaseTrainer):
 
             pbar.set_description(f"Train Epoch: {self.current_epoch} Loss: {loss.item():.4f}")
 
-            # if self.writer is not None and batch_idx % self.log_step == 0:
-            #     self.writer.add_image('input_train', make_grid(images.cpu(), nrow=8, normalize=True))
-
             pbar.update(chunk)
 
+        # Update target to prevent overfitting
+        self.update_target(gt_noisy, reconstruction)
+        
         log_dict = self.train_metrics.result()
-        # pbar.close()
-        # self.lr_scheduler.step()
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
         
@@ -187,3 +196,14 @@ class SIRENTrainer(BaseTrainer):
         self.logger.debug(f"++> Finished evaluating epoch {self.current_epoch}.")
         
         return self.eval_metrics.result()
+    
+    def update_target(self, gt_noisy, reconstruction):
+        self.update_counter += 1
+
+        if self.update_counter >= self.update_cycle:
+            print(f"Updating Target.")
+            self.update_counter = 0
+            self.N += 1
+            # damp = self.alph / self.N**2
+            damp = np.exp(-self.N / 2.0)
+            self.psuedo_target = (1 - damp) * reconstruction.detach() + damp * gt_noisy
