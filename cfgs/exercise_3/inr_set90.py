@@ -201,10 +201,10 @@ q4_experiment = dict(
         torch.optim.Adam,
         lr=1e-4
     ),
-    # lr_scheduler = partial(
-    #     torch.optim.lr_scheduler.StepLR,
-    #     step_size=5, gamma=0.8
-    # ),
+    lr_scheduler = partial(
+        torch.optim.lr_scheduler.StepLR,
+        step_size=5, gamma=0.8
+    ),
 
     criterion = nn.MSELoss,
     criterion_args = dict(),
@@ -256,7 +256,7 @@ q5_experiment = dict(
     ),
     lr_scheduler = partial(
         torch.optim.lr_scheduler.LambdaLR,
-        step_size=5, gamma=0.8
+        lr_lambda = lambda x :  0.1**min(x/10000, 1)
     ),
 
     criterion = nn.MSELoss,
