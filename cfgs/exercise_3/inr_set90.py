@@ -5,11 +5,11 @@ import torch.nn as nn
 
 from src.data_loaders.single_image_dataset import SingleImageDataset
 from src.data_loaders.pyramid_image_dataset import PyramidImageDataset
-from trainers.baseline_trainer import BaselineTrainer
-from trainers.boosting_trainer import BoostingTrainer
-from trainers.earlystop_trainer import EarlystopTrainer
-from trainers.sboost_trainer import SBoostTrainer
-from trainers.pyramid_trainer import PyramidTrainer
+from src.trainers.baseline_trainer import BaselineTrainer
+from src.trainers.boosting_trainer import BoostingTrainer
+from src.trainers.earlystop_trainer import EarlystopTrainer
+from src.trainers.sboost_trainer import SBoostTrainer
+from src.trainers.pyramid_trainer import PyramidTrainer
 from src.models.INR.siren import Siren
 from src.models.INR.metric import PSNR
 
