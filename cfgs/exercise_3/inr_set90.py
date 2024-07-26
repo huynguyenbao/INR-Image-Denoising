@@ -11,17 +11,20 @@ from src.trainers.earlystop_trainer import EarlystopTrainer
 from src.trainers.sboost_trainer import SBoostTrainer
 from src.trainers.pyramid_trainer import PyramidTrainer
 from src.models.INR.siren import Siren
+from src.models.INR.wire import Wire
+from src.models.INR.finer import Finer
+
 from src.models.INR.metric import PSNR
 
 q1_experiment = dict(
-    name = 'camera_man_siren',
+    name = 'baseline_siren',
 
     model_arch = Siren,
     model_args = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=2, 
+        hidden_layers=3, 
         outermost_linear=True
     ),
 
@@ -52,7 +55,7 @@ q1_experiment = dict(
     trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 700,
+        epochs = 1000,
         chunk = 256*256,
         eval_period = 50,
         save_dir = "./Saved/",
@@ -67,14 +70,14 @@ q1_experiment = dict(
 
 
 q2_experiment = dict(
-    name = 'camera_man_early_siren',
+    name = 'earlystop_siren',
 
     model_arch = Siren,
     model_args = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=2, 
+        hidden_layers=3, 
         outermost_linear=True
     ),
 
@@ -105,7 +108,7 @@ q2_experiment = dict(
     trainer_module = EarlystopTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 700,
+        epochs = 1000,
         chunk = 256*256,
         eval_period = 50,
         save_dir = "./Saved/",
@@ -120,14 +123,14 @@ q2_experiment = dict(
 
 
 q3_experiment = dict(
-    name = 'camera_man_boosting_bsiren',
+    name = 'boosting_siren',
 
     model_arch = Siren,
     model_args = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=2, 
+        hidden_layers=3, 
         outermost_linear=True
     ),
 
@@ -158,7 +161,7 @@ q3_experiment = dict(
     trainer_module = BoostingTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 700,
+        epochs = 1000,
         update_cycle = 400,
         chunk = 256*256,
         eval_period = 50,
@@ -174,14 +177,14 @@ q3_experiment = dict(
 
 
 q4_experiment = dict(
-    name = 'camera_man_sboost_bsiren',
+    name = 'sboosting_siren',
 
     model_arch = Siren,
     model_args = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=2, 
+        hidden_layers=3, 
         outermost_linear=True
     ),
 
@@ -228,29 +231,32 @@ q4_experiment = dict(
 )
 
 q5_experiment = dict(
-    name = 'camera_man_psboost_siren',
+    name = 'baseline_wire',
 
-    model_arch = Siren,
+    model_arch = Wire,
     model_args = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=2, 
+        hidden_layers=3, 
         outermost_linear=True
     ),
 
-    datamodule = PyramidImageDataset,
+    datamodule = SingleImageDataset,
     data_args = dict(
         image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        pyramid_levels=4,
         target_range=[-1,1],
     ),
 
     optimizer = partial(
         torch.optim.Adam,
-        lr=1e-4
+        lr=5e-3
+    ),
+    lr_scheduler = partial(
+        torch.optim.lr_scheduler.LambdaLR,
+        step_size=5, gamma=0.8
     ),
 
     criterion = nn.MSELoss,
@@ -260,18 +266,17 @@ q5_experiment = dict(
         psnr = PSNR(1),
     ),
 
-    trainer_module = PyramidTrainer,
+    trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 1000,
+        epochs = 10000,
         chunk = 256*256,
-        iters_per_level=100,
         eval_period = 50,
         save_dir = "./Saved/",
-        save_period = 100,
+        save_period = 200,
         monitor = "off",
         early_stop = 0,
-        log_step = 100,
+        log_step = 20,
         tensorboard=True,
         wandb=False,
     ),
