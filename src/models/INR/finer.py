@@ -4,6 +4,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import math
 
 from collections import OrderedDict
 
@@ -29,9 +30,9 @@ class VariablePeriodicLayer(nn.Module):
     def init_weights(self):
         with torch.no_grad():
             if self.is_first:
-                self.linear.weight.uniform_(-1/torch.sqrt(2), 1/torch.sqrt(2))      
+                self.linear.weight.uniform_(-1/math.sqrt(2), 1/math.sqrt(2))      
             else:
-                self.linear.weight.uniform_(-1/torch.sqrt(2), 1/torch.sqrt(2))
+                self.linear.weight.uniform_(-1/math.sqrt(2), 1/math.sqrt(2))
         
     def forward(self, input):
         y = self.linear(input)
