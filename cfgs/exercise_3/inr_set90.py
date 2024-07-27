@@ -30,7 +30,7 @@ q1_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[-1,1],
@@ -50,6 +50,7 @@ q1_experiment = dict(
 
     metrics=dict(
         psnr = PSNR(1),
+        ssim = SSIM(1, 1),
     ),
 
     trainer_module = BaselineTrainer,
@@ -83,7 +84,7 @@ q2_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[-1,1],
@@ -103,6 +104,7 @@ q2_experiment = dict(
 
     metrics=dict(
         psnr = PSNR(1),
+        ssim = SSIM(1.0, 1)
     ),
 
     trainer_module = EarlystopTrainer,
@@ -136,7 +138,7 @@ q3_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[-1,1],
@@ -156,6 +158,7 @@ q3_experiment = dict(
 
     metrics=dict(
         psnr = PSNR(1),
+        ssim = SSIM(1, 1),
     ),
 
     trainer_module = BoostingTrainer,
@@ -190,7 +193,7 @@ q4_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         pyramid_levels = 4,
@@ -211,6 +214,7 @@ q4_experiment = dict(
 
     metrics=dict(
         psnr = PSNR(1),
+        ssim = SSIM(1.0, 1)
     ),
 
     trainer_module = SBoostTrainer,
@@ -247,7 +251,7 @@ q5_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project/data/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[-1,1],
