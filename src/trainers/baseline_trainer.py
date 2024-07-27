@@ -34,7 +34,7 @@ class BaselineTrainer(BaseTrainer):
         # Configure the optimizer and lr scheduler
         # These are usually Python Partial() objects that have all the options already inserted.
         self.optimizer = self.config['optimizer'](trainable_params)
-        # self.lr_scheduler = self.config['lr_scheduler'](self.optimizer) 
+        self.lr_scheduler = self.config.get('lr_scheduler', None) 
 
         # Set Dataset
         self.train_eval_set = train_eval_set
@@ -125,7 +125,12 @@ class BaselineTrainer(BaseTrainer):
             pbar.set_description(f"Train Epoch: {self.current_epoch} Loss: {loss.item():.4f}")
 
             pbar.update(chunk)
-        
+
+            del loss
+
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+
         # Compute PNSR/ ... between reconstruction and noisy image
         output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
@@ -140,6 +145,9 @@ class BaselineTrainer(BaseTrainer):
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
         
+        del reconstruct, coords, gt_noisy
+        torch.cuda.empty_cache()
+
         return log_dict
     
     @torch.no_grad()
@@ -204,6 +212,11 @@ class BaselineTrainer(BaseTrainer):
         for metric_key, result in eval_results.items():
             print(f"Metric {metric_key}: {result}")
 
+        log_dict = self.eval_metrics.result()
+        
         self.logger.debug(f"++> Finished evaluating epoch {self.current_epoch}.")
         
-        return self.eval_metrics.result()
+        del reconstruct, coords, gt_clean
+        torch.cuda.empty_cache()
+        
+        return log_dict

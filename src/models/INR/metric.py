@@ -14,7 +14,7 @@ class PSNR:
     def compute(self, output, target):
         mse = torch.mean((output - target)**2)
         psnr = 10 * torch.log10(self.data_range**2 / mse)
-        return psnr
+        return psnr.item()
     
     def __str__(self):
         return f"PSNR data_range: {self.data_range}"
@@ -32,7 +32,7 @@ class SSIM:
 
     def compute(self, output, target):
         ssim_noise = self.SSIM(target, output) 
-        return ssim_noise
+        return ssim_noise.item()
     
     def __str__(self):
         return f"SSIM data_range: {self.data_range}"

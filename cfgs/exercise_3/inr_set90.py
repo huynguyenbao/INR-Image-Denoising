@@ -40,10 +40,6 @@ q1_experiment = dict(
         torch.optim.Adam,
         lr=1e-4
     ),
-    lr_scheduler = partial(
-        torch.optim.lr_scheduler.StepLR,
-        step_size=5, gamma=0.8
-    ),
 
     criterion = nn.MSELoss,
     criterion_args = dict(),
@@ -93,10 +89,6 @@ q2_experiment = dict(
     optimizer = partial(
         torch.optim.Adam,
         lr=1e-4
-    ),
-    lr_scheduler = partial(
-        torch.optim.lr_scheduler.StepLR,
-        step_size=5, gamma=0.8
     ),
 
     criterion = nn.MSELoss,
@@ -148,10 +140,6 @@ q3_experiment = dict(
         torch.optim.Adam,
         lr=1e-4
     ),
-    # lr_scheduler = partial(
-    #     torch.optim.lr_scheduler.StepLR,
-    #     step_size=5, gamma=0.8
-    # ),
 
     criterion = nn.MSELoss,
     criterion_args = dict(),
@@ -203,10 +191,6 @@ q4_experiment = dict(
     optimizer = partial(
         torch.optim.Adam,
         lr=1e-4
-    ),
-    lr_scheduler = partial(
-        torch.optim.lr_scheduler.StepLR,
-        step_size=5, gamma=0.8
     ),
 
     criterion = nn.MSELoss,
@@ -274,13 +258,14 @@ q5_experiment = dict(
 
     metrics=dict(
         psnr = PSNR(1),
+        ssim = SSIM(1.0, 1)
     ),
 
     trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 10000,
-        chunk = 256*256,
+        chunk = 256*128,
         eval_period = 100,
         save_dir = "./Saved/",
         save_period = 500,

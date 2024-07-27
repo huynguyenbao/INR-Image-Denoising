@@ -34,7 +34,7 @@ class BoostingTrainer(BaseTrainer):
         # Configure the optimizer and lr scheduler
         # These are usually Python Partial() objects that have all the options already inserted.
         self.optimizer = self.config['optimizer'](trainable_params)
-        # self.lr_scheduler = self.config['lr_scheduler'](self.optimizer) 
+        self.lr_scheduler = self.config.get('lr_scheduler', None) 
 
         # Set Dataset
         self.train_eval_set = train_eval_set
@@ -134,6 +134,11 @@ class BoostingTrainer(BaseTrainer):
 
             pbar.update(chunk)
 
+            del loss
+
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+
         # Update target to prevent overfitting
         self.update_target(gt_noisy, reconstruct)
         
@@ -151,6 +156,9 @@ class BoostingTrainer(BaseTrainer):
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
         
+        del reconstruct, coords, gt_noisy
+        torch.cuda.empty_cache()
+
         return log_dict
     
     @torch.no_grad()
@@ -216,9 +224,14 @@ class BoostingTrainer(BaseTrainer):
         for metric_key, result in eval_results.items():
             print(f"Metric {metric_key}: {result}")
 
+        log_dict = self.eval_metrics.result()
+
         self.logger.debug(f"++> Finished evaluating epoch {self.current_epoch}.")
-        
-        return self.eval_metrics.result()
+
+        del reconstruct, coords, gt_clean
+        torch.cuda.empty_cache()
+
+        return log_dict
     
     def update_target(self, gt_noisy, reconstruction):
         self.update_counter += 1
