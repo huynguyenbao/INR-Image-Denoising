@@ -29,9 +29,9 @@ class VariablePeriodicLayer(nn.Module):
     def init_weights(self):
         with torch.no_grad():
             if self.is_first:
-                self.linear.weight.uniform_(-10, 10)      
+                self.linear.weight.uniform_(-1/torch.sqrt(2), 1/torch.sqrt(2))      
             else:
-                self.linear.weight.uniform_(-10, 10)
+                self.linear.weight.uniform_(-1/torch.sqrt(2), 1/torch.sqrt(2))
         
     def forward(self, input):
         y = self.linear(input)

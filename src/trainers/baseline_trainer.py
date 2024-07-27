@@ -55,9 +55,21 @@ class BaselineTrainer(BaseTrainer):
             writer=self.writer)
 
         # Baseline Result
-        eval_results = {}        
+        eval_results = {}
+        self.image_shape = train_eval_set.image_shape
+        if len(self.image_shape) == 2:
+            self.image_shape = [1, 1, self.image_shape[0], self.image_shape[1]]
+        elif len(self.image_shape) == 3:
+            # TODO: WRONG
+            self.image_shape = [1, self.image_shape[0], self.image_shape[1], self.image_shape[2]]
+        else:
+            raise Exception()
+            exit()
+
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(train_eval_set.gt_noisy, train_eval_set.gt_clean)
+            result = metric_func.compute(
+                torch.Tensor(train_eval_set.noisy_image).reshape(self.image_shape), 
+                torch.Tensor(train_eval_set.clean_image).reshape(self.image_shape))
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result
@@ -116,11 +128,11 @@ class BaselineTrainer(BaseTrainer):
         
         # Compute PNSR/ ... between reconstruction and noisy image
         output_range = self.config['data_args']['target_range']
-        reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
-        gt_noisy_transformed = normalize(gt_noisy, output_range, [0, 1])
+        reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
+        gt_noisy = normalize(gt_noisy, output_range, [0, 1]).reshape(self.image_shape)
 
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(reconstruct_transformed, gt_noisy_transformed)
+            result = metric_func.compute(reconstruct, gt_noisy)
             self.train_metrics.update(metric_key, result)
 
 
@@ -166,11 +178,11 @@ class BaselineTrainer(BaseTrainer):
         # Compute PNSR/ ... between reconstruction and clean image
         eval_results = {}
         output_range = self.config['data_args']['target_range']
-        reconstruct_transformed = normalize(reconstruct, output_range, [0, 1])
-        gt_clean_transformed = normalize(gt_clean, output_range, [0, 1])
+        reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
+        gt_clean = normalize(gt_clean, output_range, [0, 1]).reshape(self.image_shape)
 
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(reconstruct_transformed, gt_clean_transformed)
+            result = metric_func.compute(reconstruct, gt_clean)
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result

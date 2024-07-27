@@ -14,7 +14,7 @@ from src.models.INR.siren import Siren
 from src.models.INR.wire import Wire
 from src.models.INR.finer import Finer
 
-from src.models.INR.metric import PSNR
+from src.models.INR.metric import PSNR, SSIM
 
 q1_experiment = dict(
     name = 'baseline_siren',
@@ -24,7 +24,7 @@ q1_experiment = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=3, 
+        hidden_layers=2, 
         outermost_linear=True
     ),
 
@@ -62,8 +62,8 @@ q1_experiment = dict(
         save_period = 200,
         monitor = "off",
         early_stop = 0,
-        log_step = 20,
-        tensorboard=True,
+        log_step = 100,
+        tensorboard=False,
         wandb=False,
     ),
 )
@@ -77,7 +77,7 @@ q2_experiment = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=3, 
+        hidden_layers=2, 
         outermost_linear=True
     ),
 
@@ -115,8 +115,8 @@ q2_experiment = dict(
         save_period = 200,
         monitor = "on",
         early_stop = 1,
-        log_step = 20,
-        tensorboard=True,
+        log_step = 100,
+        tensorboard=False,
         wandb=False,
     ),
 )
@@ -130,7 +130,7 @@ q3_experiment = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=3, 
+        hidden_layers=2, 
         outermost_linear=True
     ),
 
@@ -169,8 +169,8 @@ q3_experiment = dict(
         save_period = 100,
         monitor = "off",
         early_stop = 0,
-        log_step = 100,
-        tensorboard=True,
+        log_step = 1000,
+        tensorboard=False,
         wandb=False,
     ),
 )
@@ -184,7 +184,7 @@ q4_experiment = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=3, 
+        hidden_layers=2, 
         outermost_linear=True
     ),
 
@@ -224,8 +224,8 @@ q4_experiment = dict(
         save_period = 100,
         monitor = "off",
         early_stop = 0,
-        log_step = 100,
-        tensorboard=True,
+        log_step = 1000,
+        tensorboard=False,
         wandb=False,
     ),
 )
@@ -238,7 +238,10 @@ q5_experiment = dict(
         in_features=2, 
         out_features=1, 
         hidden_features=256, 
-        hidden_layers=3, 
+        hidden_layers=2,
+        first_omega_0 = 5.0,           # Frequency of sinusoid
+        hidden_omega_0 = 5.0,
+        scale = 5.0,           # Sigma of Gaussian
         outermost_linear=True
     ),
 
@@ -252,13 +255,16 @@ q5_experiment = dict(
 
     optimizer = partial(
         torch.optim.Adam,
-        lr=5e-3
+        lr=3e-5
     ),
+    # lr_scheduler = partial(
+    #     torch.optim.lr_scheduler.StepLR,
+    #     step_size=5, gamma=0.8
+    # ),
     lr_scheduler = partial(
         torch.optim.lr_scheduler.LambdaLR,
-        lr_lambda = lambda x :  0.1**min(x/10000, 1)
+        lr_lambda= lambda x: 0.1**min(x/10000, 1)
     ),
-
     criterion = nn.MSELoss,
     criterion_args = dict(),
 
@@ -271,13 +277,13 @@ q5_experiment = dict(
         n_gpu = 1,
         epochs = 10000,
         chunk = 256*256,
-        eval_period = 50,
+        eval_period = 100,
         save_dir = "./Saved/",
-        save_period = 200,
+        save_period = 500,
         monitor = "off",
         early_stop = 0,
-        log_step = 20,
-        tensorboard=True,
+        log_step = 100,
+        tensorboard=False,
         wandb=False,
     ),
 )

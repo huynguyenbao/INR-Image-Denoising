@@ -19,14 +19,14 @@ class SingleImageDataset:
         )
 
         # Intensity Transformation
-        noisy_image = normalize(corrupted_image, original_range, target_range)
-        clean_image = normalize(input_image, original_range, target_range)
+        self.noisy_image = normalize(corrupted_image, original_range, target_range)
+        self.clean_image = normalize(input_image, original_range, target_range)
         
         # Create Training Data
-        H, W = noisy_image.shape[:2]
+        H, W = self.noisy_image.shape[:2]
         self.coords = self.get_mgrid(H, W)
-        self.gt_noisy = image_numpy2torch(noisy_image, RGB_mode)
-        self.gt_clean = image_numpy2torch(clean_image, RGB_mode)
+        self.gt_noisy = image_numpy2torch(self.noisy_image, RGB_mode)
+        self.gt_clean = image_numpy2torch(self.clean_image, RGB_mode)
         
         self.image_res = H * W
         self.image_shape = input_image.shape

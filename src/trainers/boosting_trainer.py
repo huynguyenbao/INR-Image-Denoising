@@ -44,16 +44,32 @@ class BoostingTrainer(BaseTrainer):
 
         # Prepare Metrics
         self.metric_functions = self.config['metrics']
+
         self.train_metrics = MetricTracker(
-            keys=['loss'],
+            keys=['loss'] + [metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
+        
+        self.eval_N = 0
         self.eval_metrics = MetricTracker(
             keys=[metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
 
-        eval_results = {}        
+        # Baseline Result
+        eval_results = {}
+        self.image_shape = train_eval_set.image_shape
+        if len(self.image_shape) == 2:
+            self.image_shape = [1, 1, self.image_shape[0], self.image_shape[1]]
+        elif len(self.image_shape) == 3:
+            # TODO: WRONG
+            self.image_shape = [1, self.image_shape[0], self.image_shape[1], self.image_shape[2]]
+        else:
+            raise Exception()
+            exit()
+
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(train_eval_set.gt_noisy, train_eval_set.gt_clean)
+            result = metric_func.compute(
+                torch.Tensor(train_eval_set.noisy_image).reshape(self.image_shape), 
+                torch.Tensor(train_eval_set.clean_image).reshape(self.image_shape))
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result
@@ -87,7 +103,7 @@ class BoostingTrainer(BaseTrainer):
         
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
-        reconstruction = torch.zeros_like(gt_noisy).to(self._device)
+        reconstruct = torch.zeros_like(gt_noisy).to(self._device)
 
         if self.psuedo_target is None:
             self.psuedo_target = gt_noisy.clone()
@@ -100,7 +116,7 @@ class BoostingTrainer(BaseTrainer):
             batch_gt_noisy = self.psuedo_target[:, batch_indices, :]
             
             output = self.model.forward(batch_coords)
-            reconstruction[:, batch_indices, :] = output
+            reconstruct[:, batch_indices, :] = output
 
             loss = self.criterion(output, batch_gt_noisy)
             
@@ -119,8 +135,18 @@ class BoostingTrainer(BaseTrainer):
             pbar.update(chunk)
 
         # Update target to prevent overfitting
-        self.update_target(gt_noisy, reconstruction)
+        self.update_target(gt_noisy, reconstruct)
         
+
+        # Compute PNSR/ ... between reconstruction and noisy image
+        output_range = self.config['data_args']['target_range']
+        reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
+        gt_noisy = normalize(gt_noisy, output_range, [0, 1]).reshape(self.image_shape)
+
+        for metric_key, metric_func in self.metric_functions.items():
+            result = metric_func.compute(reconstruct, gt_noisy)
+            self.train_metrics.update(metric_key, result)
+
         log_dict = self.train_metrics.result()
 
         self.logger.debug(f"==> Finished Epoch {self.current_epoch}/{self.epochs}.")
@@ -162,16 +188,17 @@ class BoostingTrainer(BaseTrainer):
             pbar.update(chunk)
         pbar.close()
 
+        # Compute PNSR/ ... between reconstruction and clean image
         eval_results = {}
-        reconstruct_transformed = normalize(reconstruct, self.config['data_args']['target_range'], [0, 1])
-        gt_clean_transformed = normalize(gt_clean, self.config['data_args']['target_range'], [0, 1])
+        output_range = self.config['data_args']['target_range']
+        reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
+        gt_clean = normalize(gt_clean, output_range, [0, 1]).reshape(self.image_shape)
 
         for metric_key, metric_func in self.metric_functions.items():
-            result = metric_func.compute(reconstruct_transformed, gt_clean_transformed)
+            result = metric_func.compute(reconstruct, gt_clean)
             self.eval_metrics.update(metric_key, result)
 
             eval_results[metric_key] = result
-
         # Save denoised image  
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
