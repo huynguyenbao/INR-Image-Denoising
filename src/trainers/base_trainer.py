@@ -60,6 +60,11 @@ class BaseTrainer:
         self.counter = 0
         self.min_delta = 0
 
+        self.eval_N = 0
+
+        self.train_result_history = {}
+        self.eval_result_history = {}
+
     def _configure_logging(self, log_dir):
         self.logger = logging.getLogger()
         self.logger.setLevel(1)
@@ -101,13 +106,9 @@ class BaseTrainer:
         self.not_improved_count = 0        
         if self.wandb_enabled: wandb.watch(self.model, self.criterion, log='all')
 
-        self.train_result_history = {}
-        self.eval_result_history = {}
-
         for epoch in range(self.start_epoch, self.epochs + 1):
             self.current_epoch = epoch
             train_result = self._train_epoch()
-
             # store the train_result to plot
             self.train_result_history[self.current_epoch] = train_result
                 
@@ -150,10 +151,16 @@ class BaseTrainer:
                 path = os.path.join(self.checkpoint_dir, f'E{self.current_epoch}_model.pth')
                 self.save_model(path=path)
 
+                STATE_PATH = os.path.join(self.checkpoint_dir, f'E{self.current_epoch}_state.pth')
+                self.save_state(STATE_PATH)
+            
+
         # Always save the last model
         path = os.path.join(self.checkpoint_dir, f'last_model.pth')
         self.save_model(path=path)
-
+        STATE_PATH = os.path.join(self.checkpoint_dir, f'last_state.pth')
+        self.save_state(STATE_PATH)
+        
         return self.train_result_history, self.eval_result_history
 
     def should_evaluate(self):
@@ -212,21 +219,35 @@ class BaseTrainer:
         """
         raise NotImplementedError
 
-        # return False
+
+    @abstractmethod # To be implemented by the child classes!
+    def get_model_state(self):
+        raise NotImplementedError
+
+    @abstractmethod # To be implemented by the child classes!
+    def set_model_state(self, checkpoint):
+        raise NotImplementedError
     
-        # # Default case
-        # if self.early_stop == inf:
-        #     return False
-        
-        # if current_result == self.monitor_best:
-        #     self.counter = 0
-        #     return False
+    def save_state(self, PATH):
+        print(f"Saving to: {PATH}")
 
-        # if current_result < self.monitor_best + self.min_delta:
-        #     self.counter += 1
+        model_state = self.get_model_state()
+        model_state['train_result_history'] = self.train_result_history
+        model_state['eval_result_history'] = self.eval_result_history
+        model_state['current_epoch'] = self.current_epoch
+        model_state['eval_N'] = self.eval_N
 
-        #     if self.counter >= self.early_stop:
-        #         return True
-        # else:
-        #     self.counter = 0
-        #     return True
+        torch.save(model_state, PATH)
+
+    def load_state(self, PATH):
+        if PATH is None:
+            return
+        print(f"Loading from: {PATH}")
+        checkpoint = torch.load(PATH)
+
+        self.train_result_history = checkpoint['train_result_history']
+        self.eval_result_history = checkpoint['eval_result_history']
+        self.start_epoch = checkpoint['current_epoch']
+        self.eval_N = checkpoint['eval_N']
+
+        self.set_model_state(checkpoint)

@@ -35,6 +35,8 @@ class BoostingTrainer(BaseTrainer):
         # These are usually Python Partial() objects that have all the options already inserted.
         self.optimizer = self.config['optimizer'](trainable_params)
         self.lr_scheduler = self.config.get('lr_scheduler', None) 
+        if self.lr_scheduler:
+            self.lr_scheduler = self.lr_scheduler(self.optimizer)
 
         # Set Dataset
         self.train_eval_set = train_eval_set
@@ -49,7 +51,6 @@ class BoostingTrainer(BaseTrainer):
             keys=['loss'] + [metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
         
-        self.eval_N = 0
         self.eval_metrics = MetricTracker(
             keys=[metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
@@ -76,6 +77,10 @@ class BoostingTrainer(BaseTrainer):
 
         for metric_key, result in eval_results.items():
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
+        
+        # Loading state
+        STATE_PATH = self.config.get('state_path', None)
+        self.load_state(STATE_PATH)
         
         # Additional Config
         self.update_cycle = self.config['trainer_config']['update_cycle']
@@ -104,6 +109,7 @@ class BoostingTrainer(BaseTrainer):
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         reconstruct = torch.zeros_like(gt_noisy).to(self._device)
+        output_range = self.config['data_args']['target_range']
 
         if self.psuedo_target is None:
             self.psuedo_target = gt_noisy.clone()
@@ -115,7 +121,7 @@ class BoostingTrainer(BaseTrainer):
             batch_coords = coords[:, batch_indices, ...]
             batch_gt_noisy = self.psuedo_target[:, batch_indices, :]
             
-            output = self.model.forward(batch_coords)
+            output = self.model(batch_coords).clamp(output_range[0], output_range[1])
             reconstruct[:, batch_indices, :] = output
 
             loss = self.criterion(output, batch_gt_noisy)
@@ -144,7 +150,6 @@ class BoostingTrainer(BaseTrainer):
         
 
         # Compute PNSR/ ... between reconstruction and noisy image
-        output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
         gt_noisy = normalize(gt_noisy, output_range, [0, 1]).reshape(self.image_shape)
 
@@ -191,7 +196,7 @@ class BoostingTrainer(BaseTrainer):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
 
-            reconstruct[:, batch_indices] = self.model(batch_coords)
+            reconstruct[:, batch_indices] = self.model(batch_coords).clamp(output_range[0], output_range[1])
 
             pbar.update(chunk)
         pbar.close()
@@ -211,7 +216,7 @@ class BoostingTrainer(BaseTrainer):
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
         
-        denoised = normalize(denoised, self.config['data_args']['target_range'], [0, 255])
+        denoised = normalize(denoised, [0, 1], [0, 255])
         denoised = denoised.astype(np.int32)
 
         image_path = os.path.join(

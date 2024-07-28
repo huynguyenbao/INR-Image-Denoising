@@ -34,7 +34,9 @@ class BaselineTrainer(BaseTrainer):
         # Configure the optimizer and lr scheduler
         # These are usually Python Partial() objects that have all the options already inserted.
         self.optimizer = self.config['optimizer'](trainable_params)
-        self.lr_scheduler = self.config.get('lr_scheduler', None) 
+        self.lr_scheduler = self.config.get('lr_scheduler', None)
+        if self.lr_scheduler:
+            self.lr_scheduler = self.lr_scheduler(self.optimizer)
 
         # Set Dataset
         self.train_eval_set = train_eval_set
@@ -49,7 +51,6 @@ class BaselineTrainer(BaseTrainer):
             keys=['loss'] + [metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
         
-        self.eval_N = 0
         self.eval_metrics = MetricTracker(
             keys=[metric_key for metric_key in self.metric_functions.keys()],
             writer=self.writer)
@@ -77,6 +78,10 @@ class BaselineTrainer(BaseTrainer):
         for metric_key, result in eval_results.items():
             print(f"Noisy Image Quality Measurement: {metric_key}: {result}")
 
+        # Loading state
+        STATE_PATH = self.config.get('state_path', None)
+        self.load_state(STATE_PATH)
+
     def _train_epoch(self):
         """
         Training logic for an epoch. Only takes care of doing a single training loop.
@@ -100,6 +105,8 @@ class BaselineTrainer(BaseTrainer):
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         reconstruct = torch.zeros_like(gt_noisy).to(self._device)
 
+        output_range = self.config['data_args']['target_range']
+
         for batch_idx in range(0, image_res, chunk):
 
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
@@ -107,7 +114,7 @@ class BaselineTrainer(BaseTrainer):
             batch_coords = coords[:, batch_indices, ...]
             batch_gt_noisy = gt_noisy[:, batch_indices, :]
 
-            output = self.model.forward(batch_coords)
+            output = self.model(batch_coords).clamp(output_range[0], output_range[1])
             reconstruct[:, batch_indices, :] = output
 
             loss = self.criterion(output, batch_gt_noisy)
@@ -132,7 +139,6 @@ class BaselineTrainer(BaseTrainer):
             self.lr_scheduler.step()
 
         # Compute PNSR/ ... between reconstruction and noisy image
-        output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
         gt_noisy = normalize(gt_noisy, output_range, [0, 1]).reshape(self.image_shape)
 
@@ -174,18 +180,18 @@ class BaselineTrainer(BaseTrainer):
         coords = self.train_eval_set.coords.to(self._device)
         gt_clean = self.train_eval_set.gt_clean.to(self._device)
         reconstruct = torch.zeros_like(gt_clean).to(self._device)
+        output_range = self.config['data_args']['target_range']
 
         for batch_idx in range(0, image_res, chunk):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
-            reconstruct[:, batch_indices] = self.model(batch_coords)
+            reconstruct[:, batch_indices] = self.model(batch_coords).clamp(output_range[0], output_range[1])
             pbar.update(chunk)
 
         pbar.close()
 
         # Compute PNSR/ ... between reconstruction and clean image
         eval_results = {}
-        output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
         gt_clean = normalize(gt_clean, output_range, [0, 1]).reshape(self.image_shape)
 
@@ -199,7 +205,7 @@ class BaselineTrainer(BaseTrainer):
         denoised = reconstruct.cpu().detach().numpy()
         denoised = denoised.reshape(self.train_eval_set.image_shape)
         
-        denoised = normalize(denoised, self.config['data_args']['target_range'], [0, 255])
+        denoised = normalize(denoised, [0, 1], [0, 255])
         denoised = denoised.astype(np.int32)
 
         image_path = os.path.join(
@@ -220,3 +226,15 @@ class BaselineTrainer(BaseTrainer):
         torch.cuda.empty_cache()
         
         return log_dict
+    
+    def get_model_state(self):
+        states = {
+            'model_state': self.model.state_dict(),
+            'optimizer_state': self.optimizer.state_dict(),
+        }
+
+        return states
+    
+    def set_model_state(self, checkpoint):
+        self.model.load_state_dict(checkpoint['model_state'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state'])

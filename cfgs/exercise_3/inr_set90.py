@@ -33,7 +33,7 @@ q1_experiment = dict(
         image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        target_range=[-1,1],
+        target_range=[0,1],
     ),
 
     optimizer = partial(
@@ -48,7 +48,7 @@ q1_experiment = dict(
         psnr = PSNR(1),
         ssim = SSIM(1, 1),
     ),
-
+    
     trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
@@ -83,7 +83,7 @@ q2_experiment = dict(
         image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        target_range=[-1,1],
+        target_range=[0,1],
     ),
 
     optimizer = partial(
@@ -133,7 +133,7 @@ q3_experiment = dict(
         image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        target_range=[-1,1],
+        target_range=[0,1],
     ),
 
     optimizer = partial(
@@ -185,7 +185,7 @@ q4_experiment = dict(
         noise_level = 25,
         RGB_mode = False,
         pyramid_levels = 4,
-        target_range = [-1,1],
+        target_range = [0,1],
     ),
 
     optimizer = partial(
@@ -238,7 +238,7 @@ q5_experiment = dict(
         image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        target_range=[-1,1],
+        target_range=[0,1],
     ),
 
     optimizer = partial(
@@ -249,10 +249,10 @@ q5_experiment = dict(
     #     torch.optim.lr_scheduler.StepLR,
     #     step_size=5, gamma=0.8
     # ),
-    lr_scheduler = partial(
-        torch.optim.lr_scheduler.LambdaLR,
-        lr_lambda= lambda x: 0.1**min(x/10000, 1)
-    ),
+    # lr_scheduler = partial(
+    #     torch.optim.lr_scheduler.LambdaLR,
+    #     lr_lambda= lambda x: 0.1**min(x/10000, 1)
+    # ),
     criterion = nn.MSELoss,
     criterion_args = dict(),
 
@@ -260,12 +260,13 @@ q5_experiment = dict(
         psnr = PSNR(1),
         ssim = SSIM(1.0, 1)
     ),
+    # state_path = '/content/drive/MyDrive/Project2/Saved/baseline_wire/E10_state.pth',
 
     trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
         epochs = 10000,
-        chunk = 256*128,
+        chunk = 256*256,
         eval_period = 100,
         save_dir = "./Saved/",
         save_period = 500,
