@@ -30,7 +30,7 @@ q1_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[0,1],
@@ -52,7 +52,7 @@ q1_experiment = dict(
     trainer_module = BaselineTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 1000,
+        epochs = 2000,
         chunk = 256*256,
         eval_period = 50,
         save_dir = "./Saved/",
@@ -80,7 +80,7 @@ q2_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[0,1],
@@ -102,7 +102,7 @@ q2_experiment = dict(
     trainer_module = EarlystopTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 1000,
+        epochs = 2000,
         chunk = 256*256,
         eval_period = 50,
         save_dir = "./Saved/",
@@ -130,7 +130,7 @@ q3_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
         target_range=[0,1],
@@ -152,7 +152,7 @@ q3_experiment = dict(
     trainer_module = BoostingTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 1000,
+        epochs = 2000,
         update_cycle = 400,
         chunk = 256*256,
         eval_period = 50,
@@ -181,10 +181,10 @@ q4_experiment = dict(
 
     datamodule = SingleImageDataset,
     data_args = dict(
-        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
+        image_path = "/content/drive/MyDrive/HLCV-Assignments/Project2/data/color/Lenna.bmp", 
         noise_level = 25,
         RGB_mode = False,
-        pyramid_levels = 4,
+        # pyramid_levels = 4,
         target_range = [0,1],
     ),
 
@@ -204,8 +204,8 @@ q4_experiment = dict(
     trainer_module = SBoostTrainer,
     trainer_config = dict(
         n_gpu = 1,
-        epochs = 1000,
-        update_cycle = 100,
+        epochs = 2000,
+        update_cycle = 250,
         chunk = 256*256,
         eval_period = 50,
         save_dir = "./Saved/",
@@ -218,62 +218,62 @@ q4_experiment = dict(
     ),
 )
 
-q5_experiment = dict(
-    name = 'baseline_wire',
+# q5_experiment = dict(
+#     name = 'baseline_wire',
 
-    model_arch = Wire,
-    model_args = dict(
-        in_features=2, 
-        out_features=1, 
-        hidden_features=256, 
-        hidden_layers=2,
-        first_omega_0 = 5.0,           # Frequency of sinusoid
-        hidden_omega_0 = 5.0,
-        scale = 5.0,           # Sigma of Gaussian
-        outermost_linear=True
-    ),
+#     model_arch = Wire,
+#     model_args = dict(
+#         in_features=2, 
+#         out_features=1, 
+#         hidden_features=256, 
+#         hidden_layers=2,
+#         first_omega_0 = 5.0,           # Frequency of sinusoid
+#         hidden_omega_0 = 5.0,
+#         scale = 5.0,           # Sigma of Gaussian
+#         outermost_linear=True
+#     ),
 
-    datamodule = SingleImageDataset,
-    data_args = dict(
-        image_path = "/content/drive/MyDrive/Project2/data/color/Lenna.bmp", 
-        noise_level = 25,
-        RGB_mode = False,
-        target_range=[0,1],
-    ),
+#     datamodule = SingleImageDataset,
+#     data_args = dict(
+#         image_path = "/content/drive/MyDrive/HLCV-Assignments/Project2/data/color/Lenna.bmp", 
+#         noise_level = 25,
+#         RGB_mode = False,
+#         target_range=[-1,1],
+#     ),
 
-    optimizer = partial(
-        torch.optim.Adam,
-        lr=3e-5
-    ),
-    # lr_scheduler = partial(
-    #     torch.optim.lr_scheduler.StepLR,
-    #     step_size=5, gamma=0.8
-    # ),
-    # lr_scheduler = partial(
-    #     torch.optim.lr_scheduler.LambdaLR,
-    #     lr_lambda= lambda x: 0.1**min(x/10000, 1)
-    # ),
-    criterion = nn.MSELoss,
-    criterion_args = dict(),
+#     optimizer = partial(
+#         torch.optim.Adam,
+#         lr=3e-5
+#     ),
+#     # lr_scheduler = partial(
+#     #     torch.optim.lr_scheduler.StepLR,
+#     #     step_size=5, gamma=0.8
+#     # ),
+#     # lr_scheduler = partial(
+#     #     torch.optim.lr_scheduler.LambdaLR,
+#     #     lr_lambda= lambda x: 0.1**min(x/10000, 1)
+#     # ),
+#     criterion = nn.MSELoss,
+#     criterion_args = dict(),
 
-    metrics=dict(
-        psnr = PSNR(1),
-        ssim = SSIM(1.0, 1)
-    ),
-    # state_path = '/content/drive/MyDrive/Project2/Saved/baseline_wire/E10_state.pth',
+#     metrics=dict(
+#         psnr = PSNR(1),
+#         ssim = SSIM(1.0, 1)
+#     ),
+#     # state_path = '/content/drive/MyDrive/HLCV-Assignments/Project2/Saved/baseline_wire/E10_state.pth',
 
-    trainer_module = BaselineTrainer,
-    trainer_config = dict(
-        n_gpu = 1,
-        epochs = 10000,
-        chunk = 256*256,
-        eval_period = 100,
-        save_dir = "./Saved/",
-        save_period = 500,
-        monitor = "off",
-        early_stop = 0,
-        log_step = 100,
-        tensorboard=False,
-        wandb=False,
-    ),
-)
+#     trainer_module = BaselineTrainer,
+#     trainer_config = dict(
+#         n_gpu = 1,
+#         epochs = 10000,
+#         chunk = 256*256,
+#         eval_period = 100,
+#         save_dir = "./Saved/",
+#         save_period = 500,
+#         monitor = "off",
+#         early_stop = 0,
+#         log_step = 100,
+#         tensorboard=False,
+#         wandb=False,
+#     ),
+# )
