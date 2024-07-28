@@ -191,6 +191,8 @@ class BoostingTrainer(BaseTrainer):
         # gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         gt_clean = self.train_eval_set.gt_clean.to(self._device)
         reconstruct = torch.zeros_like(gt_clean).to(self._device)
+        output_range = self.config['data_args']['target_range']
+
         for batch_idx in range(0, image_res, chunk):
 
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
@@ -203,7 +205,6 @@ class BoostingTrainer(BaseTrainer):
 
         # Compute PNSR/ ... between reconstruction and clean image
         eval_results = {}
-        output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
         gt_clean = normalize(gt_clean, output_range, [0, 1]).reshape(self.image_shape)
 
@@ -245,3 +246,15 @@ class BoostingTrainer(BaseTrainer):
             print(f"Updating Target.")
             self.update_counter = 0
             self.psuedo_target = (reconstruction.detach() + gt_noisy) / 2
+
+    def get_model_state(self):
+        states = {
+            'model_state': self.model.state_dict(),
+            'optimizer_state': self.optimizer.state_dict(),
+        }
+
+        return states
+    
+    def set_model_state(self, checkpoint):
+        self.model.load_state_dict(checkpoint['model_state'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state'])

@@ -248,3 +248,16 @@ class SBoostTrainer(BaseTrainer):
             # damp = self.alph / self.N**2
             damp = np.exp(-self.N / 2.0)
             self.psuedo_target = (1 - damp) * reconstruction.detach() + damp * gt_noisy
+
+    
+    def get_model_state(self):
+        states = {
+            'model_state': self.model.state_dict(),
+            'optimizer_state': self.optimizer.state_dict(),
+        }
+
+        return states
+    
+    def set_model_state(self, checkpoint):
+        self.model.load_state_dict(checkpoint['model_state'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state'])

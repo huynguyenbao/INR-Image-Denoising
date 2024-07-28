@@ -100,6 +100,7 @@ class EarlystopTrainer(BaseTrainer):
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         reconstruct = torch.zeros_like(gt_noisy).to(self._device)
+        output_range = self.config['data_args']['target_range']
 
         for batch_idx in range(0, image_res, chunk):
 
@@ -133,7 +134,6 @@ class EarlystopTrainer(BaseTrainer):
             self.lr_scheduler.step()
 
         # Compute PNSR/ ... between reconstruction and noisy image
-        output_range = self.config['data_args']['target_range']
         reconstruct = normalize(reconstruct, output_range, [0, 1]).reshape(self.image_shape)
         gt_noisy = normalize(gt_noisy, output_range, [0, 1]).reshape(self.image_shape)
 
@@ -234,15 +234,14 @@ class EarlystopTrainer(BaseTrainer):
         coords = self.train_eval_set.coords.to(self._device)
         gt_noisy = self.train_eval_set.gt_noisy.to(self._device)
         reconstruct = torch.zeros_like(gt_noisy).to(self._device)
-        
+        output_range = self.config['data_args']['target_range']
+
         for batch_idx in range(0, image_res, chunk):
             batch_indices = indices[batch_idx:min(image_res, batch_idx+chunk)]
             batch_coords = coords[:, batch_indices, ...]
             reconstruct[:, batch_indices] = self.model(batch_coords).clamp(output_range[0], output_range[1])
         
-        # Stoping criteria
-        output_range = self.config['data_args']['target_range']
-        
+        # Stoping criteria        
         gt_noisy = normalize(gt_noisy, output_range, [0, 1])
         reconstruct = normalize(reconstruct, output_range, [0, 1])
         error = torch.mean((reconstruct - gt_noisy)**2)
@@ -254,4 +253,15 @@ class EarlystopTrainer(BaseTrainer):
             return True
         else:
             return False
-       
+    
+    def get_model_state(self):
+        states = {
+            'model_state': self.model.state_dict(),
+            'optimizer_state': self.optimizer.state_dict(),
+        }
+
+        return states
+    
+    def set_model_state(self, checkpoint):
+        self.model.load_state_dict(checkpoint['model_state'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state'])
